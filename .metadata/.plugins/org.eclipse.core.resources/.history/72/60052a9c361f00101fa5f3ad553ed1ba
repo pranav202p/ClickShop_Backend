@@ -1,0 +1,57 @@
+package com.trivium.service.email;
+
+import org.apache.logging.log4j.message.SimpleMessage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+@Service
+public class EmailService {
+   
+	@Autowired
+	private JavaMailSender mailSender;
+	
+  
+	
+	public void sendVerificationEmail(String to,String verificationLink) {
+		SimpleMailMessage message=new SimpleMailMessage();
+		message.setTo(to);
+		message.setSubject("Verify your email");
+		message.setText("Click the link to verify your account: " + verificationLink);
+		 mailSender.send(message);
+		
+	}
+	
+	public void sendOrderSummaryEmail(String to, String orderSummary) {
+	    SimpleMailMessage message = new SimpleMailMessage();
+	    message.setTo(to);
+	    message.setSubject("🧾 Your Order Summary - ClickShop.");
+	    message.setText(orderSummary);
+	    mailSender.send(message);
+	}
+	
+	public void sendAdminDetails(String to, String username, String password) {
+	    SimpleMailMessage message = new SimpleMailMessage();
+	    message.setTo(to);
+	    message.setSubject("Welcome to ClickShop - Admin Access Details");
+
+	    message.setText(
+	        "Hi there,\n\n" +
+	        "You have been successfully added as an admin to the ClickShop platform.\n\n" +
+	        "Your login credentials are as follows:\n" +
+	        "--------------------------------------\n" +
+	        "Email   : " + username + "\n" +
+	        "Password: " + password + "\n" +
+	        "--------------------------------------\n\n" +
+	       
+	        "ClickShop Team\n" +
+	        "support@clickshop.com"
+	    );
+
+	    mailSender.send(message);
+	}
+
+
+	
+}

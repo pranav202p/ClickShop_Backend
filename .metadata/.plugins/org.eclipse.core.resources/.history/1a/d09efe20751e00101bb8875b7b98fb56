@@ -1,0 +1,51 @@
+package com.trivium.service.admin;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.web.multipart.MultipartFile;
+
+import com.trivium.model.Admin;
+import com.trivium.model.Order;
+import com.trivium.model.Product;
+import com.trivium.model.Settings;
+import com.trivium.model.User;
+import com.trivium.model.Warehouse;
+
+public interface AdminService {
+    
+	List<User> getAllUsers();
+	
+	List<Order> getAllOrders();
+	
+	List<Product> getAllProducts();
+	
+	void deleteProduct(String id);
+	
+	Product addProduct(Product product);
+	
+	Product updateProductById(String id, Product updatedProduct);
+	
+	public List<Warehouse> getAllWarehouses();
+
+	public Optional<Warehouse> getWarehouseById(String id) ;
+
+	public Warehouse addWarehouse(Warehouse warehouse);
+
+	public Warehouse updateWarehouse(Warehouse warehouse);
+
+	public void deleteWarehouse(String id);
+    
+	public List<Settings> getAllSettings();
+	 
+	public  Settings createSettings(Settings settings);
+	
+	public Admin addAdmin(Admin admin);
+	
+	public  Admin updateAdmin(Long id, Admin admin);
+	
+	public   void deleteAdmin(Long id);
+	
+	public   List<Admin> getAllAdmins();
+}

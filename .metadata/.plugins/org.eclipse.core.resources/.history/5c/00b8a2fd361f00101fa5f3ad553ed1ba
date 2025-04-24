@@ -1,0 +1,71 @@
+package com.trivium.service.email;
+
+import org.apache.logging.log4j.message.SimpleMessage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.stereotype.Service;
+
+@Service
+public class EmailService {
+   
+	@Autowired
+	private JavaMailSender mailSender;
+	
+  
+	
+	public void sendVerificationEmail(String to,String verificationLink) {
+		SimpleMailMessage message=new SimpleMailMessage();
+		message.setTo(to);
+		message.setSubject("Verify your email");
+		message.setText("Dear Customer,\n\n" +
+	               "Thank you for registering with ShopEasy! To ensure the security of your account and access all features of our online store, please verify your email address.\n\n" +
+	               "Click the link below to verify your account:\n" + 
+	               verificationLink + "\n\n" +
+	               "This verification link will expire in 24 hours for security purposes.\n\n" +
+	               "After verification, you'll be able to:\n" +
+	               "• Browse our complete product catalog\n" +
+	               "• Track your order history\n" +
+	               "If you did not create an account with Clickshop, please disregard this email.\n\n" +
+	               "For any questions or assistance, please contact our customer support team at support@shopeasy.com.\n\n" +
+	               "Thank you for choosing Clickshop!\n\n" +
+	               "Best regards,\n" +
+	               "The Clikshop Team\n\n" +
+	               "------------------------------------------\n" +
+	               "This is an automated message. Please do not reply to this email.");
+		 mailSender.send(message);
+		
+	}
+	
+	public void sendOrderSummaryEmail(String to, String orderSummary) {
+	    SimpleMailMessage message = new SimpleMailMessage();
+	    message.setTo(to);
+	    message.setSubject("🧾 Your Order Summary - ClickShop.");
+	    message.setText(orderSummary);
+	    mailSender.send(message);
+	}
+	
+	public void sendAdminDetails(String to, String username, String password) {
+	    SimpleMailMessage message = new SimpleMailMessage();
+	    message.setTo(to);
+	    message.setSubject("Welcome to ClickShop - Admin Access Details");
+
+	    message.setText(
+	        "Hi there,\n\n" +
+	        "You have been successfully added as an admin to the ClickShop platform.\n\n" +
+	        "Your login credentials are as follows:\n" +
+	        "--------------------------------------\n" +
+	        "Email   : " + username + "\n" +
+	        "Password: " + password + "\n" +
+	        "--------------------------------------\n\n" +
+	       
+	        "ClickShop Team\n" +
+	        "support@clickshop.com"
+	    );
+
+	    mailSender.send(message);
+	}
+
+
+	
+}

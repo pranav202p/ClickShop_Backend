@@ -1,0 +1,143 @@
+package com.trivium.service.user;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.security.authorization.method.AuthorizeReturnObject;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.trivium.dto.RegisterRequest;
+import com.trivium.model.Cart;
+import com.trivium.model.Product;
+import com.trivium.model.User;
+import com.trivium.repository.CartRepository;
+import com.trivium.repository.ProductRepository;
+import com.trivium.repository.UserRepository;
+import com.trivium.service.email.EmailService;
+
+import jakarta.transaction.Transactional;
+
+@Service
+public class UserServiceImpl implements UserService{
+	
+	@Autowired
+	EmailService emailService;
+  
+	@Autowired
+	UserRepository userrepository;
+	
+	@Autowired
+	ProductRepository productRepository;
+	
+	@Autowired
+	CartRepository cartRepository;
+	
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Override
+	public Optional<User> login(String email, String password) {
+		// TODO Auto-generated method stub
+		Optional<User> user = userrepository.findByemail(email);
+
+	    if (user.isPresent() && passwordEncoder.matches(password, user.get().getPassword())) {
+	        return user;
+	    }
+	    return Optional.empty(); 
+	}
+
+	@Override
+	public boolean register(RegisterRequest user) {
+		// TODO Auto-generated method stub
+		if (userrepository.findByemail(user.getEmail()).isPresent()) {
+	        return false;
+	    }
+		
+		 User newUser = new User();
+		    newUser.setFullName(user.getFullName());
+		    newUser.setEmail(user.getEmail());
+		    newUser.setPhoneno(user.getPhone());
+		    newUser.setPassword(passwordEncoder.encode(user.getPassword())); 
+            newUser.setRole("USER");
+            newUser.setEnabled(false);
+		  
+		    
+		    String token = UUID.randomUUID().toString(); 
+		    newUser.setVerificationToken(token);
+		    userrepository.save(newUser);
+	        String verificationLink = "http://localhost:8080/api/auth/verify?email=" + user.getEmail() + "&token=" + token;
+	        emailService.sendVerificationEmail(user.getEmail(), verificationLink);
+	        
+		    return true;
+	}
+	
+
+	public boolean verifyEmail(String email, String token) {
+	    Optional<User> optionalUser = userrepository.findByEmailAndVerificationToken(email, token);
+	    if (optionalUser.isPresent()) {
+	        User user = optionalUser.get();
+	        user.setEnabled(true);
+	        user.setVerificationToken(null); 
+	        userrepository.save(user);
+	        return true;
+	    }
+	    return false;
+	}
+
+	
+	public boolean verifyToken(String token) {
+	    Optional<User> optionalUser = userrepository.findByVerificationToken(token);
+	    if (optionalUser.isPresent()) {
+	        User user = optionalUser.get();
+	        user.setEnabled(true);
+	        user.setVerificationToken(null);
+	        userrepository.save(user);
+	        return true;
+	    }
+	    return false;
+	}
+
+	@Override
+	public List<Product> getAllProducts() {
+		// TODO Auto-generated method stub
+		return  productRepository.findAll() ;
+	}
+	
+	
+	@Override
+	@Transactional
+	public Cart addToCart(String email, Product product, int quantity) {
+
+	    User user = userrepository.findByemail(email)
+	        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+	    Optional<Cart> existingCartItem = cartRepository.findByUserAndProduct(user, product);
+
+	    Cart cart;
+	    if (existingCartItem.isPresent()) {
+	        cart = existingCartItem.get();
+	        cart.setQuantity(cart.getQuantity() + quantity); 
+	    } else {
+	        cart = new Cart(user, product, quantity); 
+	    }
+
+	    return cartRepository.save(cart);
+	}
+
+	@Override
+	public List<Cart> getCart(String email) {
+		// TODO Auto-generated method stub
+		return cartRepository.findByUserEmail(email);
+	}
+
+	
+
+	
+
+
+}

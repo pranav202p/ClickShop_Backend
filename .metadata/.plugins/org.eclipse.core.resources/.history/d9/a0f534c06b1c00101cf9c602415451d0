@@ -1,0 +1,264 @@
+package com.trivium.service.user;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.security.authorization.method.AuthorizeReturnObject;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.trivium.dto.RegisterRequest;
+import com.trivium.model.Cart;
+import com.trivium.model.Order;
+import com.trivium.model.OrderItem;
+import com.trivium.model.Product;
+import com.trivium.model.User;
+import com.trivium.repository.CartRepository;
+import com.trivium.repository.OrderRepository;
+import com.trivium.repository.ProductRepository;
+import com.trivium.repository.UserRepository;
+import com.trivium.service.email.EmailService;
+
+import jakarta.transaction.Transactional;
+
+@Service
+public class UserServiceImpl implements UserService{
+	
+	@Autowired
+	EmailService emailService;
+  
+	@Autowired
+	UserRepository userrepository;
+	
+	@Autowired
+	ProductRepository productRepository;
+	
+	@Autowired
+	OrderRepository orderRepository;
+	
+	@Autowired
+	CartRepository cartRepository;
+	
+	@Autowired
+	private PasswordEncoder passwordEncoder;
+
+	@Override
+	public Optional<User> login(String email, String password) {
+		// TODO Auto-generated method stub
+		Optional<User> user = userrepository.findByemail(email);
+
+	    if (user.isPresent() && passwordEncoder.matches(password, user.get().getPassword())) {
+	        return user;
+	    }
+	    return Optional.empty(); 
+	}
+
+	@Override
+	public boolean register(RegisterRequest user) {
+		// TODO Auto-generated method stub
+		if (userrepository.findByemail(user.getEmail()).isPresent()) {
+	        return false;
+	    }
+		
+		 User newUser = new User();
+		    newUser.setFullName(user.getFullName());
+		    newUser.setEmail(user.getEmail());
+		    newUser.setPhoneno(user.getPhone());
+		    newUser.setPassword(passwordEncoder.encode(user.getPassword())); 
+            newUser.setRole("USER");
+            newUser.setEnabled(false);
+		  
+		    
+		    String token = UUID.randomUUID().toString(); 
+		    newUser.setVerificationToken(token);
+		    userrepository.save(newUser);
+	        String verificationLink = "http://localhost:8080/api/auth/verify?email=" + user.getEmail() + "&token=" + token;
+	        emailService.sendVerificationEmail(user.getEmail(), verificationLink);
+	        
+		    return true;
+	}
+	
+
+	public boolean verifyEmail(String email, String token) {
+	    Optional<User> optionalUser = userrepository.findByEmailAndVerificationToken(email, token);
+	    if (optionalUser.isPresent()) {
+	        User user = optionalUser.get();
+	        user.setEnabled(true);
+	        user.setVerificationToken(null); 
+	        userrepository.save(user);
+	        return true;
+	    }
+	    return false;
+	}
+
+	
+	public boolean verifyToken(String token) {
+	    Optional<User> optionalUser = userrepository.findByVerificationToken(token);
+	    if (optionalUser.isPresent()) {
+	        User user = optionalUser.get();
+	        user.setEnabled(true);
+	        user.setVerificationToken(null);
+	        userrepository.save(user);
+	        return true;
+	    }
+	    return false;
+	}
+
+	@Override
+	public List<Product> getAllProducts() {
+		// TODO Auto-generated method stub
+		return  productRepository.findAll() ;
+	}
+	
+	
+	@Override
+	@Transactional
+	public Cart addToCart(String email, Product product, int quantity) {
+
+	    User user = userrepository.findByemail(email)
+	        .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+	    Optional<Cart> existingCartItem = cartRepository.findByUserAndProduct(user, product);
+
+	    Cart cart;
+	    if (existingCartItem.isPresent()) {
+	        cart = existingCartItem.get();
+	        cart.setQuantity(cart.getQuantity() + quantity); 
+	    } else {
+	        cart = new Cart(user, product, quantity); 
+	    }
+
+	    return cartRepository.save(cart);
+	}
+
+	@Override
+	public List<Cart> getCart(String email) {
+		// TODO Auto-generated method stub
+		return cartRepository.findByUserEmail(email);
+	}
+
+	@Override
+	public Optional<Product> getProductById(String id) {
+		// TODO Auto-generated method stub
+		return productRepository.findById(id);
+	}
+	
+
+	@Transactional
+	public void placeOrder(Map<String, Object> requestBody, String email) {
+	    try {
+	        
+
+	        // Retrieve the user from the email
+	        User user = userrepository.findByemail(email)
+	                .orElseThrow(() -> new RuntimeException("User not found"));
+
+	        // Retrieve the subtotal and cart items from the request body
+	        double amount = Double.parseDouble(requestBody.get("subtotal").toString());
+	        List<Map<String, Object>> cartItems = (List<Map<String, Object>>) requestBody.get("cart");
+
+	        if (cartItems == null || cartItems.isEmpty()) {
+	            throw new RuntimeException("Cart is empty, cannot place order");
+	        }
+
+	        // Create new order
+	        Order order = new Order();
+	        order.setOrderId("ORD" + UUID.randomUUID().toString().substring(0, 8));
+	        order.setOrderDate(LocalDate.now());
+	        order.setAmount(amount);
+	        order.setStatus("PLACED");
+	        order.setUser(user);
+
+	        // Add items to the order
+	        for (Map<String, Object> item : cartItems) {
+	            Map<String, Object> product = (Map<String, Object>) item.get("product");
+
+	            // Check for null or invalid fields
+	            if (product.get("name") == null || product.get("imageUrl") == null || product.get("price") == null) {
+	                throw new RuntimeException("Missing product details in cart item");
+	            }
+
+	            OrderItem orderItem = new OrderItem();
+	            orderItem.setProductName(product.get("name").toString());
+	            orderItem.setProductImageUrl(product.get("imageUrl").toString());
+	            orderItem.setPrice(Double.parseDouble(product.get("price").toString()));
+	            orderItem.setQuantity(Integer.parseInt(item.get("quantity").toString()));
+	            orderItem.setOrder(order); 
+	            order.getItems().add(orderItem);
+	        }
+
+	        // Save the order to the database
+	        orderRepository.save(order); 
+
+	        // Delete items from the user's cart
+	        cartRepository.deleteByUser(user);
+	        
+	        String orderSummary = buildOrderSummary(cartItems, amount);
+	        emailService.sendOrderSummaryEmail(email, orderSummary);
+	        
+	       
+	    } catch (Exception e) {
+	        
+	        System.err.println("Error placing order: " + e.getMessage());
+	        throw new RuntimeException("Error placing order: " + e.getMessage());
+	    }
+	}
+
+	
+
+	private String buildOrderSummary(List<Map<String, Object>> cartItems, double subtotal) {
+	    StringBuilder summary = new StringBuilder();
+	    summary.append("Thank you for shopping with ClickShop!\n\n");
+	    summary.append("🛒 Order Summary:\n");
+
+	    for (Map<String, Object> item : cartItems) {
+	        Map<String, Object> product = (Map<String, Object>) item.get("product");
+	        String name = product.get("name").toString();
+	        double price = Double.parseDouble(product.get("price").toString());
+	        int quantity = Integer.parseInt(item.get("quantity").toString());
+
+	        summary.append("- ")
+	               .append(name)
+	               .append(" x ").append(quantity)
+	               .append(" = ₹").append(price * quantity)
+	               .append("\n");
+	    }
+
+	    summary.append("\nSubtotal: ₹").append(subtotal);
+	    summary.append("\nDelivery: ₹0.00");
+	    summary.append("\nTotal: ₹").append(subtotal);
+	    summary.append("\n\nYou will receive another email once your order is shipped.");
+
+	    return summary.toString();
+	}
+
+	@Override
+	public void removeItemFromCart(Long  cartId, String email) {
+		 Optional<Cart> cartOptional = cartRepository.findById(cartId);
+		    if (cartOptional.isEmpty()) {
+		        throw new IllegalArgumentException("Cart item not found");
+		    }
+
+		    Cart cart = cartOptional.get();
+		    if (!cart.getUser().getEmail().equalsIgnoreCase(email)) {
+		        throw new IllegalArgumentException("Unauthorized access to cart item");
+		    }
+
+		    cartRepository.delete(cart);
+	}
+
+	@Override
+	public List<Order> getOrders(String email) {
+		// TODO Auto-generated method stub
+		return orderRepository.findByUserEmail(email);
+	}
+
+
+
+}

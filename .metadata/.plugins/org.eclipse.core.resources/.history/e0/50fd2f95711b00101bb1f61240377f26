@@ -1,0 +1,22 @@
+package com.trivium.service.user;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import com.trivium.dto.RegisterRequest;
+import com.trivium.model.Cart;
+import com.trivium.model.Product;
+import com.trivium.model.User;
+
+public interface UserService {
+  
+	public Optional<User> login(String email,String password);
+	public boolean  register(RegisterRequest  user);
+	public boolean verifyToken(String token);
+	public List<Product> getAllProducts();
+	public Cart addToCart(String email, Product product, int quantity);
+	public List<Cart> getCart(String email);
+	public  Optional<Product> getProductById(String id);
+	public void placeOrder(Map<String, Object> requestBody, String email);
+}

@@ -1,0 +1,238 @@
+package com.trivium.service.admin;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.trivium.dto.OrderDTO;
+import com.trivium.dto.ProductItemDTO;
+import com.trivium.model.Admin;
+import com.trivium.model.Order;
+import com.trivium.model.Product;
+import com.trivium.model.Settings;
+import com.trivium.model.User;
+import com.trivium.model.Warehouse;
+import com.trivium.repository.AdminRepository;
+import com.trivium.repository.OrderRepository;
+import com.trivium.repository.ProductRepository;
+import com.trivium.repository.SettingsRepository;
+import com.trivium.repository.UserRepository;
+import com.trivium.repository.WarehouseRepository;
+
+@Service
+public class AdminServiceImpl implements AdminService {
+
+	
+	@Autowired
+	UserRepository userRepository;
+	
+	@Autowired
+	OrderRepository orderRepository;
+	
+	@Autowired
+	ProductRepository productRepository;
+	
+	@Autowired
+	WarehouseRepository warehouseRepository;
+	
+	@Autowired
+	SettingsRepository settingsRepository;
+	
+	@Autowired
+	AdminRepository adminRepository;
+	
+	public List<User> getAllUsers() {
+        
+        List<User> users = userRepository.findAll();
+
+        
+        for (User user : users) {
+            double totalSpent = user.getOrders().stream()
+                                    .mapToDouble(Order::getAmount) 
+                                    .sum();
+            
+            user.setTotalSpent(totalSpent);
+        }
+        
+        return users;
+    }
+	
+	public List<OrderDTO> getAllOrders() {
+	    List<Order> orders = orderRepository.findAll();
+	    List<OrderDTO> orderDTOs = new ArrayList<>();
+
+	    for (Order order : orders) {
+	        String userEmail = (order.getUser() != null) ? order.getUser().getEmail() : null;
+
+	        List<ProductItemDTO> productDTOs = order.getItems().stream()
+	            .map(item -> new ProductItemDTO(
+	                item.getProductName(),
+	                item.getProductImageUrl(),
+	                item.getPrice(),
+	                item.getQuantity()
+	            ))
+	            .collect(Collectors.toList());
+
+	        OrderDTO dto = new OrderDTO(
+	            order.getOrderId(),
+	            order.getOrderDate(),
+	            order.getAmount(),
+	            order.getStatus(),
+	            userEmail,
+	            productDTOs
+	        );
+
+	        orderDTOs.add(dto);
+	    }
+
+	    return orderDTOs;
+	}
+
+	@Override
+	public List<Product> getAllProducts() {
+		// TODO Auto-generated method stub
+		return productRepository.findAll();
+	}
+
+	@Override
+	public void deleteProduct(String id) {
+	    Optional<Product> product = productRepository.findById(id);
+	    
+	    if (product.isPresent()) {
+	        productRepository.delete(product.get());
+	        System.out.println("Product deleted successfully.");
+	    } else {
+	        System.out.println("Product not found.");
+	    }
+	}
+
+	@Override
+	public Product addProduct(Product product) {
+		// TODO Auto-generated method stub
+		product.setId("P" + UUID.randomUUID().toString().substring(0, 8));
+	    product.setCreatedAt(LocalDateTime.now());
+	    product.setUpdatedAt(LocalDateTime.now());
+		return productRepository.save(product);
+	}
+
+	@Override
+	public Product updateProductById(String id, Product updatedProduct) {
+	    Optional<Product> existingProductOpt = productRepository.findById(id);
+
+	    if (existingProductOpt.isEmpty()) {
+	        throw new NoSuchElementException("Product not found");
+	    }
+
+	    Product existingProduct = existingProductOpt.get();
+
+
+	    existingProduct.setPrice(updatedProduct.getPrice());
+	    existingProduct.setStock(updatedProduct.getStock());
+	    
+	    if (updatedProduct.getImageUrl() != null && !updatedProduct.getImageUrl().isEmpty()) {
+	        existingProduct.setImageUrl(updatedProduct.getImageUrl());
+	    }
+
+	    existingProduct.setUpdatedAt(LocalDateTime.now());
+
+	    return productRepository.save(existingProduct);
+	}
+
+	@Override
+	public List<Warehouse> getAllWarehouses() {
+		// TODO Auto-generated method stub
+		 return warehouseRepository.findAll();
+	}
+
+	@Override
+	public Optional<Warehouse> getWarehouseById(String id) {
+		// TODO Auto-generated method stub
+		return warehouseRepository.findById(id);
+	}
+
+	@Override
+	public Warehouse addWarehouse(Warehouse warehouse) {
+		// TODO Auto-generated method stub
+		warehouse.setId("W" + UUID.randomUUID().toString().substring(0, 8));
+		return warehouseRepository.save(warehouse);
+	}
+
+	@Override
+	public Warehouse updateWarehouse(Warehouse warehouse) {
+		// TODO Auto-generated method stub
+		return warehouseRepository.save(warehouse);
+	}
+
+	@Override
+	public void deleteWarehouse(String id) {
+		// TODO Auto-generated method stub
+		warehouseRepository.deleteById(id);
+	}
+
+	@Override
+	public List<Settings> getAllSettings() {
+		// TODO Auto-generated method stub
+		return settingsRepository.findAll();
+	}
+
+	@Override
+	public Settings createSettings(Settings settings) {
+		// TODO Auto-generated method stub
+		 return settingsRepository.save(settings);
+	}
+
+	@Override
+	public Admin addAdmin(Admin admin) {
+		// TODO Auto-generated method stub
+		  return adminRepository.save(admin);
+	}
+
+	@Override
+	public Admin updateAdmin(Long id, Admin  updatedAdmin) {
+		// TODO Auto-generated method stub
+		 Admin admin = adminRepository.findById(id)
+	                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+	        admin.setName(updatedAdmin.getName());
+	        admin.setEmail(updatedAdmin.getEmail());
+	        admin.setPassword(updatedAdmin.getPassword());
+	        return adminRepository.save(admin);
+	}
+
+	@Override
+	public void deleteAdmin(Long id) {
+		// TODO Auto-generated method stub
+		 adminRepository.deleteById(id);
+	}
+
+	@Override
+	public List<Admin> getAllAdmins() {
+		// TODO Auto-generated method stub
+		  return adminRepository.findAll();
+	}
+
+	@Override
+	public boolean isAdmin(String email) {
+		// TODO Auto-generated method stub
+		return false;
+	}
+	
+
+	
+	
+	
+
+}

@@ -1,0 +1,16 @@
+package com.trivium.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.trivium.model.Cart;
+import com.trivium.model.Product;
+import com.trivium.model.User;
+
+public interface CartRepository extends JpaRepository<Cart, Long> {
+    List<Cart> findByUserEmail(String email);
+    Optional<Cart> findByUserAndProduct(User user, Product product);
+
+}
